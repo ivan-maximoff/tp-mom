@@ -66,4 +66,45 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
     def __init__(self, host, exchange_name, routing_keys):
+        self.exchange_name = exchange_name
+        self.routing_keys = routing_keys
+
+        try:
+            self._connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=host)
+            )
+            self._channel = self._connection.channel()
+
+            self._channel.exchange_declare(
+                exchange=self.exchange_name,
+                exchange_type='direct'
+            )
+
+            result = self._channel.queue_declare(queue='', exclusive=True)
+            random_queue_name = result.method.queue
+            self.queue_name = random_queue_name
+
+            for routing_key in self.routing_keys:
+                self._channel.queue_bind(
+                    exchange=self.exchange_name,
+                    queue=self.queue_name,
+                    routing_key=routing_key
+                )
+        except Exception:
+            raise
+
+    def close(self):
+        try:
+            if self._connection.is_open:
+                self._connection.close()
+        except Exception:
+            raise MessageMiddlewareCloseError()
+
+    def send(self, message):
+        pass
+
+    def start_consuming(self, on_message_callback):
+        pass
+
+    def stop_consuming(self):
         pass
