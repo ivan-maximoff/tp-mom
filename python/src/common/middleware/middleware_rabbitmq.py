@@ -91,5 +91,5 @@ class MessageMiddlewareExchangeRabbitMQ(_RabbitMQMiddleware, MessageMiddlewareEx
             )
 
     def send(self, message):
-        rk = self.routing_keys[0] if self.routing_keys else ''
-        self._publish(exchange=self.exchange_name, routing_key=rk, message=message)
+        routing_key = random.choice(self.routing_keys) if self.routing_keys else ''
+        self._publish(exchange=self.exchange_name, routing_key=routing_key, message=message)
