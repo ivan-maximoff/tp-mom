@@ -1,7 +1,7 @@
 import pika
 import random
 import string
-from .middleware import MessageMiddlewareCloseError, MessageMiddlewareQueue, MessageMiddlewareExchange
+from .middleware import MessageMiddlewareCloseError, MessageMiddlewareDisconnectedError, MessageMiddlewareMessageError, MessageMiddlewareQueue, MessageMiddlewareExchange
 
 class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
 
@@ -26,13 +26,42 @@ class MessageMiddlewareQueueRabbitMQ(MessageMiddlewareQueue):
             raise MessageMiddlewareCloseError()
 
     def send(self, message):
-        pass
+        try:
+            self._channel.basic_publish(
+                exchange='',
+                routing_key=self.queue_name,
+                body=message
+            )
+        except pika.exceptions.AMQPConnectionError:
+            raise MessageMiddlewareDisconnectedError()
+        except Exception:
+            raise MessageMiddlewareMessageError()
 
     def start_consuming(self, on_message_callback):
-        pass
+        def internal_callback(ch, method, _, body):
+            def ack():
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            def nack():
+                ch.basic_nack(delivery_tag=method.delivery_tag)
+            on_message_callback(body, ack, nack)
+
+        try:
+            self._channel.basic_consume(
+                queue=self.queue_name,
+                on_message_callback=internal_callback
+            )
+            self._channel.start_consuming()
+        except pika.exceptions.AMQPConnectionError:
+            raise MessageMiddlewareDisconnectedError()
+        except pika.exceptions.ConnectionClosedByBroker:
+            pass
 
     def stop_consuming(self):
-        pass
+        try:
+            if self._channel and self._channel.is_open:
+                self._channel.stop_consuming()
+        except Exception:
+            pass
 
 class MessageMiddlewareExchangeRabbitMQ(MessageMiddlewareExchange):
     
