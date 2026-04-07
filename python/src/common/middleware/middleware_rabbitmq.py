@@ -1,6 +1,4 @@
 import pika
-import random
-import string
 from .middleware import MessageMiddlewareCloseError, MessageMiddlewareDisconnectedError, MessageMiddlewareMessageError, MessageMiddlewareQueue, MessageMiddlewareExchange
 
 class _RabbitMQMiddleware:
@@ -91,5 +89,6 @@ class MessageMiddlewareExchangeRabbitMQ(_RabbitMQMiddleware, MessageMiddlewareEx
             )
 
     def send(self, message):
-        routing_key = random.choice(self.routing_keys) if self.routing_keys else ''
-        self._publish(exchange=self.exchange_name, routing_key=routing_key, message=message)
+        routing_keys = self.routing_keys if self.routing_keys else ['']
+        for routing_key in routing_keys:
+            self._publish(exchange=self.exchange_name, routing_key=routing_key, message=message)
