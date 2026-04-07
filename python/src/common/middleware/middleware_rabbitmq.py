@@ -1,4 +1,5 @@
 import pika
+from pika.exceptions import AMQPConnectionError, ConnectionClosedByBroker
 from .middleware import MessageMiddlewareCloseError, MessageMiddlewareDisconnectedError, MessageMiddlewareMessageError, MessageMiddlewareQueue, MessageMiddlewareExchange
 
 class _RabbitMQMiddleware:
@@ -8,7 +9,7 @@ class _RabbitMQMiddleware:
                 pika.ConnectionParameters(host=host)
             )
             self._channel = self._connection.channel()
-        except pika.exceptions.AMQPConnectionError:
+        except AMQPConnectionError:
             print(f"Error conectando a RabbitMQ en {host}")
             raise
 
@@ -26,7 +27,7 @@ class _RabbitMQMiddleware:
                 routing_key=routing_key,
                 body=message
             )
-        except pika.exceptions.AMQPConnectionError:
+        except AMQPConnectionError:
             raise MessageMiddlewareDisconnectedError()
         except Exception:
             raise MessageMiddlewareMessageError()
@@ -45,9 +46,9 @@ class _RabbitMQMiddleware:
                 on_message_callback=internal_callback
             )
             self._channel.start_consuming()
-        except pika.exceptions.AMQPConnectionError:
+        except AMQPConnectionError:
             raise MessageMiddlewareDisconnectedError()
-        except pika.exceptions.ConnectionClosedByBroker:
+        except ConnectionClosedByBroker:
             pass
 
     def stop_consuming(self):
