@@ -12,15 +12,15 @@ El código de este repositorio se agrupa en dos carpetas, una para Python y otra
 
 Al momento de la evaluación y ejecución de las pruebas se **descartarán** los cambios realizados a todos los archivos, a excepción de:
 
-**Python:** `/python/src/common/middleware/middleware_rabbitmq.py` 
+**Python:** `/python/src/common/middleware/middleware_rabbitmq.py`
 
-**Golang:** `/golang/internal/factory/*/*.go` 
+**Golang:** `/golang/internal/factory/*/*.go`
 
 ## Ejecución
 
-`make up` : Inicia contenedores de RabbitMQ  y de pruebas de integración. Comienza a seguir los logs de las pruebas.
+`make up` : Inicia contenedores de RabbitMQ y de pruebas de integración. Comienza a seguir los logs de las pruebas.
 
-`make down`:   Detiene los contenedores de pruebas y destruye los recursos asociados.
+`make down`: Detiene los contenedores de pruebas y destruye los recursos asociados.
 
 `make logs`: Sigue los logs de todos los contenedores en un solo flujo de salida.
 
@@ -31,11 +31,34 @@ Al momento de la evaluación y ejecución de las pruebas se **descartarán** los
 Habiendo iniciado el contenedor de RabbitMQ o configurado una instancia local del mismo pueden ejecutarse las pruebas sin necesidad de detener y reiniciar los contenedores ejecutando `make local`, siempre que se cumplan los siguientes requisitos.
 
 ### Python
+
 Instalar una versión de Python superior a `3.14`. Se recomienda emplear un gestor de versiones, como ser `pyenv`.
 Instalar los dependencias de la suite de pruebas:
 `pip install -r python/src/tests/requirements.txt`
 
 ### Golang
+
 Instalar una versión de Golang superior a `1.24`.
 Instalar los dependencias de la suite de pruebas:
 `go mod download`
+
+## Mi solución en Python
+
+Para reducir la duplicación, incorporé un comportamiento base compartido para las partes que eran prácticamente iguales entre ambas variantes del middleware.
+
+### Resumen del diseño
+
+- Clase base común (`_RabbitMQMiddleware`): Centraliza la configuración de la conexión y las operaciones compartidas.
+  - Manejo del ciclo de vida de conexión/canal (`__init__`, `close`).
+  - Abstracción de errores: Traducción de excepciones nativas de Pika (AMQPConnectionError) a las excepciones de dominio del TP.
+  - Método auxiliar para publicar mensajes (`_publish`).
+  - Flujo común de consumo (`start_consuming`, `stop_consuming`) con métodos de callback para `ack`/`nack`.
+- Las clases concretas conservan únicamente el comportamiento específico:
+  - `MessageMiddlewareQueueRabbitMQ`: Implementa Work Queues.
+  - `MessageMiddlewareExchangeRabbitMQ`: Implementa el patrón Pub/Sub (Exchanges).
+
+### Decisiones de Implementación
+
+- **Tipo de exchange:** Se utilizó un exchange de tipo `direct`.
+- **Envío (`send`):** El método `send` realiza un "broadcast manual", iterando sobre todas las routing keys configuradas para asegurar que el mensaje llegue a todos los destinos.
+- **Colas temporales:** En el patrón de Exchange, cada consumidor genera una cola exclusiva (`exclusive=True`) para garantizar que reciba su propia copia de los mensajes.
